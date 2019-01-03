@@ -45,19 +45,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 
 基于 NAND 的闪存是一种非易失性的 EEPROM 存储设备，闪存芯片的最小读写单元是页（page，通常 4KB），多个连续的页组成了块（block），闪存的擦除操作按块进行。图 1-a 给出了一个闪存芯片结构的示意图，其中每个块包含 128 个 4 KB 的页。
 
-<center>
-    <div style="width: 85%">
-        <img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg"
-             alt="图 1"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 1 &nbsp;
-            闪存芯片内部结构和SSD的基本模块
-        </div>
-	</div>
-</center>
-
+<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg" alt="图 1" width="75%">
 
 闪存与传统存储介质有以下几点差异：（1）读和写具有不同的延迟，写的代价高了一个数量级。（2）不支持原地写回，如果一个数据页中已经有数据了，只有将该页所属的块整体擦除，新的数据才能写入这个页。（3）每个存储单元只有有限的擦写寿命。
 
@@ -239,11 +227,11 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
 
 由于在写入数据时没有进行索引构建，因此在每次 open 数据库时判断数据文件是否存在，如果存在则进行内存索引的构建。
 
-为了充分节省内存空间，我们考虑将索引项 <key, vLog-offset> 载入内存数组，然后进行原地排序并去重。这个过程使用 64 个线程并发地对 4096 个分区索引进行快速排序，排序时间复杂度 $O(nlog n)$，之后根据 key 进行去重，排序时间复杂度 $O(n)$。
+为了充分节省内存空间，我们考虑将索引项 <key, vLog-offset> 载入内存数组，然后进行原地排序并去重。这个过程使用 64 个线程并发地对 4096 个分区索引进行快速排序，排序时间复杂度 O(nlog n)，之后根据 key 进行去重，排序时间复杂度 O(n)。
 
 排序后每个分区内有序，同时分区间有序。
 
-进行点查询（point query）时，先根据 key 的前 12 位以 $O(1)$ 的时间复杂度定位到所在分区，然后在对应分区中进行二分查找，二分查找时间复杂度为 $O(log n)$。
+进行点查询（point query）时，先根据 key 的前 12 位以 O(1) 的时间复杂度定位到所在分区，然后在对应分区中进行二分查找，二分查找时间复杂度为 O(log n)。
 
 对于区间查询（range query），同样根据最小 key 值定位到起始分区，在该分区中二分查找起始位置，然后从起始位置开始顺序扫描后续的索引项，到达分区末尾时根据分区顺序继续扫描下一个分区，直到当前扫描的 key 值大于查询范围。
 
