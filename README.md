@@ -45,7 +45,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 
 基于 NAND 的闪存是一种非易失性的 EEPROM 存储设备，闪存芯片的最小读写单元是页（page，通常 4KB），多个连续的页组成了块（block），闪存的擦除操作按块进行。图 1-a 给出了一个闪存芯片结构的示意图，其中每个块包含 128 个 4 KB 的页。
 
-<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg" alt="图 1" width="75%" align="middle">
+<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg" alt="图 1" width="75%">
 
 闪存与传统存储介质有以下几点差异：（1）读和写具有不同的延迟，写的代价高了一个数量级。（2）不支持原地写回，如果一个数据页中已经有数据了，只有将该页所属的块整体擦除，新的数据才能写入这个页。（3）每个存储单元只有有限的擦写寿命。
 
@@ -55,19 +55,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 
 为了提高 SSD 的读写带宽，通常在硬件和 FTL 上使用一种交叉（interleaving）技术。一个写操作被分为两个步骤完成：（1）将数据装入闪存芯片内部的页寄存器；（2）将已经装载的数据编程写入对应的闪存页单元。因为数据编程写入闪存单元比装入寄存器需要更多的时间，因此在编程写入闪存单元的同时，可以在其它闪存芯片上载入数据。图 2 展示了一个 4-路交叉写入的情况，这种技术隐藏了闪存编程写入的延迟。如果 SSD 中有多个独立的闪存阵列通道，那利用它们的并行性可以极大地提高 SSD 的性能。
 
-<center>
-    <div style="width: 55%">
-        <img src="https://ws4.sinaimg.cn/large/006tNc79ly1fyto56x2plj30ne0bcdg4.jpg"
-             alt="图 2"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 2 &nbsp;
-            一条总线上的四路 interleaving 技术。
-        </div>
-	</div>
-</center>
-
+<img src="https://ws4.sinaimg.cn/large/006tNc79ly1fyto56x2plj30ne0bcdg4.jpg" alt="图 1" width="50%">
 
 ###### 1.3.3 闪存转换层（FTL）
 
@@ -83,20 +71,7 @@ SSD 内的闪存阵列通过多条总线连接在控制器上，并且每条总�
 
 为了提升垃圾回收的性能，与组合页类似的，SSD 将不同闪存芯片上的多个块组成内部的擦除单元，因此可以并行地擦除多个物理块。进行垃圾回收时，如果一个组合块中只有部分页是失效的，那要将其余的页拷贝到 SSD 中的空闲区域，这种复制代价降低了 SSD 垃圾回收的性能，就是说组合块的内部碎片导致了性能的下降。
 
-<center>
-    <div style="width: 80%">
-        <img src="https://ws1.sinaimg.cn/large/006tNc79ly1fytnimuqf3j30vc0msair.jpg"
-             alt="图 3"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 3 &nbsp;
-            (a) 写请求的与组合页对齐(1)，不与组合页对齐(2,3); &nbsp;
-            (b) 顺序写与随机写的影响，请求大小小于组合块(1)，等于组合块(2)，大于组合块(3)
-        </div>
-	</div>
-</center>
-
+<img src="https://ws1.sinaimg.cn/large/006tNc79ly1fytnimuqf3j30vc0msair.jpg" alt="图 1" width="70%">
 
 我们考虑什么情况下会产生这种组合块的内部碎片。首先考虑图 3-b 中的第一种情况，写操作的请求大小小于组合页的大小，假定垃圾回收进程选择了最左侧的一个块进行回收。当数据被顺序地写入时，该块的全部数据被更新，因此该块没有可用数据，垃圾回收除了擦除该块外不需要额外代价。但是，如果随机写入情况下，该块只有部分数据被更新，产生了内部碎片，因此垃圾回收进程要将其余的数据拷贝出去，降低了写操作的性能。
 
@@ -190,37 +165,13 @@ value 的大小为固定 4KB，我们知道，写入数据大小是 SSD 组合�
 通过线上测试发现，多线程同时读单一文件会导致性能下降，我们猜测是这种读模式没有充分利用 SSD 的并行性所导致的。如果相邻分片在同一个文件中，会影响 range 阶段同时访问相邻分片时的性能。因此，我们采用了如下所示的文件架构。
 
 valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
-<center>
-    <div style="width: 70%">
-        <img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto9k13mrj318u0ncmyl.jpg"
-             alt="图 4"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 4 &nbsp;
-            value 文件架构
-        </div>
-	</div>
-</center>
 
-
+<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto9k13mrj318u0ncmyl.jpg" alt="图 1" width="60%">
 
 
 其中 keyFiles 由 64 个文件组成，包括 key 部分和 16KB 写缓存部分，分⽚⼤小及规则如下图：
-<center>
-    <div style="width: 90%">
-        <img src="https://ws2.sinaimg.cn/large/006tNc79ly1fytoafrculj31ag0k2407.jpg"
-             alt="图 5"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 5 &nbsp;
-            mmap 文件架构
-        </div>
-	</div>
-</center>
 
-
+<img src="https://ws2.sinaimg.cn/large/006tNc79ly1fytoafrculj31ag0k2407.jpg" alt="图 1" width="80%">
 
 
 #### 2.5 索引构建和查询
@@ -253,20 +204,7 @@ range 阶段 64 个线程从 buffer 获取数据，n 个读磁盘线程从文件
 
 生产者/消费者模型中的每个数据对应于我们的一个分片，因此，设置一个分片数据的缓冲区，每个缓冲区的大小为 64M。剩余内存空间为 1G 左右，可以开辟 16 个缓冲区，其中前 8 个缓存区是可替换的，后 8 个缓存是不可替换的，只能写入一次，这样第二次 range 访问到这 8 个缓冲区时就不需要读磁盘。range 阶段的内存缓冲区模型如下所示：
 
-<center>
-    <div style="width: 70%">
-        <img src="https://ws4.sinaimg.cn/large/006tNc79ly1fytoef9xodj31a40tkdhm.jpg"
-             alt="图 6"
-             >
-        <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
-            图 6 &nbsp;
-            缓冲区内存结构和逻辑结构
-        </div>
-	</div>
-</center>
-
-
+<img src="https://ws4.sinaimg.cn/large/006tNc79ly1fytoef9xodj31a40tkdhm.jpg" alt="图 1" width="60%">
 
 其中 active 部分为 Ring Buffer，prepage 部分为 open 阶段为了平衡 I/O 和 CPU 负载所载入的数据分片，reserve 部分是保留的。
 
