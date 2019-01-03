@@ -45,7 +45,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 
 基于 NAND 的闪存是一种非易失性的 EEPROM 存储设备，闪存芯片的最小读写单元是页（page，通常 4KB），多个连续的页组成了块（block），闪存的擦除操作按块进行。图 1-a 给出了一个闪存芯片结构的示意图，其中每个块包含 128 个 4 KB 的页。
 
-<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg" alt="图 1" width="75%">
+<img src="https://ws3.sinaimg.cn/large/006tNc79ly1fyto2equltj314i0hkdh0.jpg" alt="图 1" width="75%" align="middle">
 
 闪存与传统存储介质有以下几点差异：（1）读和写具有不同的延迟，写的代价高了一个数量级。（2）不支持原地写回，如果一个数据页中已经有数据了，只有将该页所属的块整体擦除，新的数据才能写入这个页。（3）每个存储单元只有有限的擦写寿命。
 
