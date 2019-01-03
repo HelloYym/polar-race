@@ -1,8 +1,8 @@
 ## PolarDB 比赛攻略
 
-#### 1 背景分析
+### 1 背景分析
 
-##### 1.1 赛题概述
+#### 1.1 赛题概述
 
 赛题：**https://code.aliyun.com/polar_race2018/competition_rules**
 
@@ -28,7 +28,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 
    顺序读取：64 个线程并发顺序读取，每个线程使用 Range 全局顺序迭代 DB 数据 2 次
 
-##### 1.2 题目重点
+#### 1.2 题目重点
 
 基于题目的描述，可以发现本次比赛并不是要求实现一个通用的 kv 数据库，而是在一些方面做了简化和限定。因此可以充分的利用题目中的这些特点进行针对性的设计，我们总结了如下几个需要考虑的重点：
 
@@ -39,7 +39,7 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
 - **key 随机分布：**根据线上表现，我们发现 key 是基本随机分布的长度为 8 的字符串。
 - **kill -9 数据持久化：**只需保证进程意外退出时数据持久化不丢失，不要求保证在系统崩溃时的数据持久化不丢失，因此可以利用操作系统的缓存对写入方式进行一些优化。
 
-##### 1.3 SSD 特性：并行、对齐、随机写
+#### 1.3 SSD 特性：并行、对齐、随机写
 
 ###### 1.3.1 基于 NAND 的闪存
 
@@ -51,12 +51,13 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
              alt="图 1"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 1 &nbsp;
             闪存芯片内部结构和SSD的基本模块
         </div>
 	</div>
 </center>
+
 
 闪存与传统存储介质有以下几点差异：（1）读和写具有不同的延迟，写的代价高了一个数量级。（2）不支持原地写回，如果一个数据页中已经有数据了，只有将该页所属的块整体擦除，新的数据才能写入这个页。（3）每个存储单元只有有限的擦写寿命。
 
@@ -72,12 +73,13 @@ RetCode Range(const PolarString &lower, const PolarString &upper, Visitor &visit
              alt="图 2"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 2 &nbsp;
             一条总线上的四路 interleaving 技术。
         </div>
 	</div>
 </center>
+
 
 ###### 1.3.3 闪存转换层（FTL）
 
@@ -99,7 +101,7 @@ SSD 内的闪存阵列通过多条总线连接在控制器上，并且每条总�
              alt="图 3"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 3 &nbsp;
             (a) 写请求的与组合页对齐(1)，不与组合页对齐(2,3); &nbsp;
             (b) 顺序写与随机写的影响，请求大小小于组合块(1)，等于组合块(2)，大于组合块(3)
@@ -107,13 +109,14 @@ SSD 内的闪存阵列通过多条总线连接在控制器上，并且每条总�
 	</div>
 </center>
 
+
 我们考虑什么情况下会产生这种组合块的内部碎片。首先考虑图 3-b 中的第一种情况，写操作的请求大小小于组合页的大小，假定垃圾回收进程选择了最左侧的一个块进行回收。当数据被顺序地写入时，该块的全部数据被更新，因此该块没有可用数据，垃圾回收除了擦除该块外不需要额外代价。但是，如果随机写入情况下，该块只有部分数据被更新，产生了内部碎片，因此垃圾回收进程要将其余的数据拷贝出去，降低了写操作的性能。
 
 接下来考虑图 3-b 中的后两种情况，如果写操作请求的大小是组合页大小的倍数，那每次随机写会整体更新组合块，并使得组合块中的全部数据失效，垃圾回收时只需要擦除选择的组合块而没有额外的代价，与顺序写的代价相同。在 FTL 的混合映射方式下，对应了切换合并（switch merge）这种最理想的情况。
 
 综上所述，因为小尺寸的随机写导致 SSD 的内部碎片，产生额外的垃圾回收代价。因此，SSD 上的存储引擎设计应该充分考虑这种 I/O 模式的影响，增加写操作的局部性，或者使用更大的读写单元与组合页对齐。
 
-##### 1.4 直接 I/O 和 mmap
+#### 1.4 直接 I/O 和 mmap
 
 ###### 1.4.1 块设备读写与 bio 机制
 
@@ -153,9 +156,9 @@ mmap 把文件映射到用户空间里的虚拟内存，省去了从内核缓冲
 
 Linux 中提供了系统调用 mmap() 来实现这种文件访问方式。与标准的访问文件的方式相比，内存映射方式可以减少标准访问文件方式中系统调用次数，并减少数据在用户地址空间和内核地址空间之间的拷贝操作。映射通常适用于较大范围，对于相同长度的数据来讲，映射所带来的开销远远低于 CPU 拷贝所带来的开销。当大量数据需要传输的时候，采用内存映射方式去访问文件会获得比较好的效率。
 
-#### 2 核心思路
+### 2 核心思路
 
-##### 2.1 数据分段
+#### 2.1 数据分段
 
 由于 key 字符串的分布是均匀的，我们根据 key 的前 12 位将全部 6400 万条数据划分到 4096 个分区，平均每个分区中数据量为 6400w / 4096 = 15625 条。根据字符串大小顺序的定义，4096 个分区之间是有序的。对数据进行分区会带来以下几个好处：
 
@@ -166,7 +169,7 @@ Linux 中提供了系统调用 mmap() 来实现这种文件访问方式。与标
 
 数据分区的方法本质上属于利用空间换时间，假设我们使用 key 的前 64 位进行划分，那每个分区最多有 1 个数据，这样就不再需要查找数据的时间，同时也不存在锁冲突。不过由于 2^64 个分区中很多是没有数据的，我们没有足够的内存空间开辟这么大的数组，因此这样是不可行的。我们经过多次线上测试，综合多个因素，最终使用 4096 的分区数量。
 
-##### 2.2 key/value 分离
+#### 2.2 key/value 分离
 
 对于 value 数据相比 key 比较大的情况，将 key 和 value 分离存储，可以解除索引构建和数据存储之间的耦合性：
 
@@ -176,7 +179,7 @@ Linux 中提供了系统调用 mmap() 来实现这种文件访问方式。与标
 
 由于 key 和 value 不同时写入文件，可能会导致进程退出时的数据不一致。我们的策略是先写 value 文件，最后写 key 文件，open 阶段根据 key 文件中 key 的个数设置 value 文件指针，这样就确保了 open 成功后 key 和 value 的个数相同，解决了一致性问题。
 
-##### 2.3 读写方式
+#### 2.3 读写方式
 
 key 的大小为固定 8 字节，对于这种小数据量的读写模式，采用 mmap 方式可以利用 page cache 将小数据量读写转换为整个内存页的读写，这样大块读写可以充分发挥 SSD 的性能。同时，相比于每次调用 read/write 函数，读写 mmap 用户内存区域不需要系统调用，大大减少了系统调用的时间消耗。
 
@@ -190,7 +193,7 @@ value 的大小为固定 4KB，我们知道，写入数据大小是 SSD 组合�
 
 对于 value 数据读取，我们依然采用 DirectIO 方式，这样可以避免操作系统预读过多无用数据到 page cache 浪费带宽。
 
-##### 2.4 文件架构
+#### 2.4 文件架构
 
 由于每个数据分段的数据量近似相等，因此我们使用定长文件存储 key 和 value。预先分配每个分区的容量为 2^14 个数据，在某些分段数据量超出容量后，可以重新分配空间进行自动扩容。
 
@@ -205,12 +208,13 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
              alt="图 4"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 4 &nbsp;
             value 文件架构
         </div>
 	</div>
 </center>
+
 
 
 
@@ -221,7 +225,7 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
              alt="图 5"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 5 &nbsp;
             mmap 文件架构
         </div>
@@ -230,7 +234,8 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
 
 
 
-##### 2.5 索引构建和查询
+
+#### 2.5 索引构建和查询
 
 由于在写入数据时没有进行索引构建，因此在每次 open 数据库时判断数据文件是否存在，如果存在则进行内存索引的构建。
 
@@ -242,7 +247,7 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
 
 对于区间查询（range query），同样根据最小 key 值定位到起始分区，在该分区中二分查找起始位置，然后从起始位置开始顺序扫描后续的索引项，到达分区末尾时根据分区顺序继续扫描下一个分区，直到当前扫描的 key 值大于查询范围。
 
-##### 2.6 平衡 I/O 和 CPU 负载
+#### 2.6 平衡 I/O 和 CPU 负载
 
 线上测试，将读取索引文件和排序两个阶段混合在一起的用时为 250ms 左右。读取索引文件主要占用 I/O 资源，排序主要占用 CPU 资源，我们认为，将两个阶段混合在一起不能完全占满 CPU 和 I/O 资源。
 
@@ -252,7 +257,7 @@ valueFiles 由 64 个⽂件组成，分⽚大小及规则如下图：
 
 由于第二阶段只剩 1/2 的排序任务，所以排序时间降低到 100ms，在这 100ms 之中，I/O 处于空闲状态，根据测试可以预先读取 4 个文件数据块到 buffer，节省了后续阶段读取文件的时间。
 
-##### 2.7 生产者/消费者模型
+#### 2.7 生产者/消费者模型
 
 range 阶段 64 个线程从 buffer 获取数据，n 个读磁盘线程从文件加载数据到 buffer，同时缓冲区大小受限。这是经典的生产者/消费者模型，缓冲区的实现是一个循环队列，我们使用条件变量（Condition Variable）来实现线程间的协作。
 
@@ -266,12 +271,13 @@ range 阶段 64 个线程从 buffer 获取数据，n 个读磁盘线程从文件
              alt="图 6"
              >
         <br>
-        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999; font-size: 13px;">
+        <div style="border-bottom: 1px solid #d9d9d9; display: inline-block; padding: 2px; color: #999;">
             图 6 &nbsp;
             缓冲区内存结构和逻辑结构
         </div>
 	</div>
 </center>
+
 
 
 其中 active 部分为 Ring Buffer，prepage 部分为 open 阶段为了平衡 I/O 和 CPU 负载所载入的数据分片，reserve 部分是保留的。
@@ -280,9 +286,9 @@ range 开始时，启动若干读磁盘线程（最终为 2 个线程），每�
 
 64 个 range 线程会依次 visit 每个分片，先判断当前分⽚是否在缓存中， 如果没有则等待。在 visit 一个分片时，由于分片索引中的 key 已经有序，只需依次取出 key 和 offset，并根据 offset 从缓存中读取相应的 value 即可。
 
-#### 3 关键代码
+### 3 关键代码
 
-##### 3.1 随机写流程
+#### 3.1 随机写流程
 
 ###### 3.1.1 建立文件和内存映射
 
@@ -363,7 +369,7 @@ inline void putValueKey(const char *value, const char * key) {
 }
 ```
 
-##### 3.2 恢复流程
+#### 3.2 恢复流程
 
 启动 64 个线程读取 key 文件内容，同时将生成的 <key, offset> 索引项存入对应 SortLog 对象中的数组，一个分片被读完后直接对索引项数组进行快速排序。
 
@@ -396,7 +402,7 @@ void recover(u_int32_t sum) {
 }
 ```
 
-##### 3.3 随机读流程
+#### 3.3 随机读流程
 
 在分片的索引数组中二分查找 key 所在位置，并返回 value 在实际文件中的偏移。
 
@@ -422,7 +428,7 @@ RetCode read(const PolarString &key, string *value) {
 static thread_local std::unique_ptr<char> readBuffer(static_cast<char *> (memalign((size_t) getpagesize(), 4096)));
 ```
 
-##### 3.4 顺序读流程
+#### 3.4 顺序读流程
 
 ###### 3.4.1 消费者线程
 
@@ -515,7 +521,7 @@ void readDisk() {
 }
 ```
 
-##### 3.5 全局参数
+#### 3.5 全局参数
 
 ```c++
 //分区数量
@@ -548,15 +554,15 @@ const int RECOVER_THREAD = 64;
 const int READDISK_THREAD = 2;
 ```
 
-#### 4 经验总结和感想
+### 4 经验总结和感想
 
-##### 文件读写方式
+#### 文件读写方式
 
 这次比赛开始利用 Java 进行开发，使用 NIO 中 FileChannel 配合 HeapByteBuffer 进行 value 读写，MappedByteBuffer 进行 key 文件的读写。根据源码发现，FileChannel 每次读写都要先从堆内内存 copy 到堆外内存，这就有了一次损耗，然后我们直接改用 DirectByteBuffer，明显有所好转。虽然用了堆外内存，但是实际上文件读写仍然需要经过内核 page cache 缓冲。这其中又多了一次拷贝，并且评测程序需要计算 drop cache 的开销。
 
 Java 原生并不支持直接 I/O，于是我们使用 JNA 直接调用系统函数实现了 Direct I/O，读写性能有明显提升。最后我们改用 C++ 开发，直接使用 Linux 提供的 Direct I/O 文件读写模式，获得了很好的效果。
 
-##### Java 对比 C++
+#### Java 对比 C++
 
 对于这次比赛的单机数据库引擎， Java 相比 C++ 存在一些劣势：
 
@@ -564,7 +570,7 @@ Java 原生并不支持直接 I/O，于是我们使用 JNA 直接调用系统函
 - C++ 相比与 Java 而言内存消耗较少，可以自己控制内存的释放，节省了 GC 时间。
 - Java 不够贴近系统底层，需要通过 JVM 解释字节码执行，相比于 C++ 直接编译后执行会稍慢一些。
 
-##### 绑核减少线程切换
+#### 绑核减少线程切换
 
 赛后与其他选手交流，发现很多人设置了 CPU 亲和性（Affinity）调度属性，将读磁盘线程与 CPU 逻辑核心绑定，range 阶段由此快 1~2 s，并且能保持测评的稳定性。
 
@@ -572,7 +578,7 @@ Java 原生并不支持直接 I/O，于是我们使用 JNA 直接调用系统函
 
 可以考虑使用 `while(true)` 轮询的自旋方式代替条件变量的阻塞方式，或者直接将 I/O 线程与 CPU 核心绑定以减少 I/O 线程切换带来的时间损失。
 
-##### 为什么不用通用 kv 数据库（leveldb）
+#### 为什么不用通用 kv 数据库（leveldb）
 
 
 
